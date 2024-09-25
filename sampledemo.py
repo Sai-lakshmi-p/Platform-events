@@ -48,8 +48,9 @@ def subscribe_to_event():
         'Content-Type': 'application/json'
     }
 
-    event_subscription_url = (f'{INSTANCE_URL}/services/data/v57.0/'
-                              'event/DemoEvent__e')
+    event_subscription_url = (
+        f'{INSTANCE_URL}/services/data/v57.0/event/DemoEvent__e'
+    )
 
     response = requests.get(event_subscription_url, headers=headers)
 
