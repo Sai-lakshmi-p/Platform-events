@@ -1,1 +1,2 @@
-web: python sampledemo.py
+web: gunicorn sampledemo:app
+
