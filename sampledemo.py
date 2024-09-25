@@ -14,10 +14,10 @@ CLIENT_SECRET = (
     '3AB2FC2C3'
 )
 USERNAME = 'sailakshmi@salesforce.com'
-PASSWORD = 'Welcome$2024'
+PASSWORD = 'Welcome$2024QqtNVG1L466zl4fJqnQmUm2Z'
 TOKEN_URL = 'https://login.salesforce.com/services/oauth2/token'
 INSTANCE_URL = ''
-ACCESS_TOKEN = 'QqtNVG1L466zl4fJqnQmUm2Z'
+ACCESS_TOKEN = ''
 
 
 # Authenticate and get access token
