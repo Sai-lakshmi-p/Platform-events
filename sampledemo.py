@@ -1,83 +1,63 @@
 import os
 import requests
-from flask import Flask
-import asyncio
-from aiohttp import ClientSession
+import json
 
 
-app = Flask(__name__)
-
-# Salesforce credentials (should ideally be in environment variables)
-CLIENT_ID = os.getenv('SALESFORCE_CLIENT_ID')
-CLIENT_SECRET = os.getenv('SALESFORCE_CLIENT_SECRET')
-USERNAME = os.getenv('SALESFORCE_USERNAME')
-PASSWORD = os.getenv('SALESFORCE_PASSWORD')
-TOKEN_URL = 'https://login.salesforce.com/services/oauth2/token'
-ACCESS_TOKEN = ''
-INSTANCE_URL = ''
+# Salesforce configuration
+SALESFORCE_INSTANCE_URL = 'https://your_instance.salesforce.com'
+SALESFORCE_CLIENT_ID = os.getenv('SALESFORCE_CLIENT_ID')
+SALESFORCE_CLIENT_SECRET = os.getenv('SALESFORCE_CLIENT_SECRET')
+SALESFORCE_USERNAME = os.getenv('SALESFORCE_USERNAME')
+SALESFORCE_PASSWORD = os.getenv('SALESFORCE_PASSWORD')
 
 
-# Authenticate and get access token
+# Get access token
 def get_access_token():
-    global ACCESS_TOKEN, INSTANCE_URL
-    data = {
+    url = f'{SALESFORCE_INSTANCE_URL}/services/oauth2/token'
+    payload = {
         'grant_type': 'password',
-        'client_id': CLIENT_ID,
-        'client_secret': CLIENT_SECRET,
-        'username': USERNAME,
-        'password': PASSWORD
+        'client_id': SALESFORCE_CLIENT_ID,
+        'client_secret': SALESFORCE_CLIENT_SECRET,
+        'username': SALESFORCE_USERNAME,
+        'password': SALESFORCE_PASSWORD
     }
 
-    response = requests.post(TOKEN_URL, data=data)
+    response = requests.post(url, data=payload)
 
     if response.status_code == 200:
-        resp_json = response.json()
-        ACCESS_TOKEN = resp_json['access_token']
-        INSTANCE_URL = resp_json['instance_url']
+        return response.json().get('access_token')
     else:
-        raise Exception(f"Failed to authenticate: {response.content}")
+        print('Error obtaining access token:', response.json())
+        return None
 
 
-async def subscribe_to_event():
-    # Create a session and a WebSocket connection
-    async with ClientSession() as session:
-        async with session.ws_connect(f"{INSTANCE_URL}/cometd/57.0") as ws:
-            # Handshake
-            handshake = {
-                "channel": "/meta/handshake",
-                "version": "1.0",
-                "minimumVersion": "1.0",
-                "clientId": ACCESS_TOKEN,
-            }
-            await ws.send_json(handshake)
-            response = await ws.receive()
-            print(f"Handshake response: {response.data}")
+# Subscribe to the platform event
+def subscribe_to_platform_event(access_token):
+    channel = '/event/DemoEvent__e'  
+    url = f'{SALESFORCE_INSTANCE_URL}/services/channel/{channel}'
+    headers = {
+        'Authorization': f'Bearer {access_token}',
+        'Content-Type': 'application/json'
+    }
 
-            # Subscribe to the platform event
-            subscribe_message = {
-                "channel": "/meta/subscribe",
-                "clientId": ACCESS_TOKEN,
-                "subscription": "/event/DemoEvent__e"
-            }
-            await ws.send_json(subscribe_message)
-            response = await ws.receive()
-            print(f"Subscription response: {response.data}")
+    # Create a long polling connection to receive events
+    response = requests.get(url, headers=headers, stream=True)
 
-            # Listen for events
-            while True:
-                event_response = await ws.receive()
-                print(f"Received event: {event_response.data}")
+    if response.status_code == 200:
+        print('Subscribed to platform event. Waiting for events...')
+
+        for line in response.iter_lines():
+            if line:
+                event = json.loads(line.decode('utf-8'))
+                print('Received event:', json.dumps(event, indent=4))
+    else:
+        print('Error subscribing to platform event:', response.json())
 
 
-@app.route('/')
-def index():
-    try:
-        get_access_token()  # Authenticate to get the access token
-        asyncio.run(subscribe_to_event())  # Subscribe to the event
-        return "Subscribed to platform events.", 200
-    except Exception as e:
-        return f"Error: {str(e)}", 500
+if __name__ == "__main__":
+    access_token = get_access_token()
 
-
-if __name__ == '__main__':
-    app.run(debug=True, host="0.0.0.0", port=5001)
+    if access_token:
+        subscribe_to_platform_event(access_token)
+    else:
+        print('Failed to obtain access token.')
